@@ -33,15 +33,12 @@ void setup()
 void loop()
 {
   byte state1 = digitalRead(sensorPin1);
-  if(state1 == 1)Serial.println("Somebody is in this area of the first sensor!");
-  else if(state1 == 0)Serial.println("No one at first sensor!");
+  if(state1 == 1)Serial.println("trein voorbijgereden aan spoor 1!");
   delay(500);
   byte state2 = digitalRead(sensorPin2);
-  if(state2 == 1)Serial.println("Somebody is in this area of the second sensor!");
-  else if(state2 == 0)Serial.println("No one at second sensor!");
+  if(state2 == 1)Serial.println("trein voorbijgereden aan spoor 2!");
   delay(500);
   byte state3 = digitalRead(sensorPin3);
-  if(state3 == 1)Serial.println("Somebody is in this area of the third sensor!");
-  else if(state3 == 0)Serial.println("No one at third sensor!");
+  if(state3 == 1)Serial.println("trein voorbijgereden aan spoor 3!");
   delay(500);
 }
