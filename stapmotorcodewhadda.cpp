@@ -13,6 +13,7 @@ int lookup[8] = {B01000, B01100, B00100, B00110, B00010, B00011, B00001, B01001}
 
 int buttonRightPin = D10;
 int buttonLeftPin = D11;
+int buttonfullpin = D12;
 
 void setOutput(int out) {
   digitalWrite(motorPin1, bitRead(lookup[out], 0));
@@ -40,6 +41,12 @@ void clockwise() {
     count--;
   }
 }
+void full(){
+   for (int i = 7; i >= 0; i--) {
+      setOutput(i);
+      delayMicroseconds(motorSpeed);
+    }
+}
 
 void setup() {
   pinMode(motorPin1, OUTPUT);
@@ -49,6 +56,7 @@ void setup() {
 
   pinMode(buttonRightPin, INPUT_PULLUP);
   pinMode(buttonLeftPin, INPUT_PULLUP);
+  pinMode(buttonfullpin, INPUT_PULLUP);
 
   Serial.begin(9600);
 }
@@ -61,5 +69,7 @@ void loop() {
   if (digitalRead(buttonLeftPin) == LOW) {
     anticlockwise();
   }
+  if (digitalRead(buttonfullpin) == LOW){
+    full();
+  }
 }
-
