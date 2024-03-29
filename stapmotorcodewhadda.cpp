@@ -1,75 +1,96 @@
-#include <Arduino.h>
+#include "Stepper.h"
 
-int motorPin1 = D3; // Blue - 28BYJ48 pin 1
-int motorPin2 = D5; // Pink - 28BYJ48 pin 2
-int motorPin3 = D6; // Yellow - 28BYJ48 pin 3
-int motorPin4 = D7; // Orange - 28BYJ48 pin 4
+// Define number of steps per revolution:
+const int stepsPerRevolution = 300;
 
-int motorSpeed = 1200;
-int count = 0;
-int countsperrev = 512;
-int maxSteps = 130; // Maximum number of steps allowed in each direction
-int lookup[8] = {B01000, B01100, B00100, B00110, B00010, B00011, B00001, B01001};
+// Give the motor control pins names:
+#define pwmA 3
+#define pwmB 11
+#define brakeA 9
+#define brakeB 8
+#define dirA 12
+#define dirB 13
 
-int buttonRightPin = D10;
-int buttonLeftPin = D11;
-int buttonfullpin = D12;
+// Buttons
+int buttonRightPin = 5;
+int buttonLeftPin = 6;
+int buttonFullPin = 7;
+int button180Pin = 4;
 
-void setOutput(int out) {
-  digitalWrite(motorPin1, bitRead(lookup[out], 0));
-  digitalWrite(motorPin2, bitRead(lookup[out], 1));
-  digitalWrite(motorPin3, bitRead(lookup[out], 2));
-  digitalWrite(motorPin4, bitRead(lookup[out], 3));
-}
+// Initialize the stepper library on the motor shield:
+Stepper myStepper = Stepper(stepsPerRevolution, dirA, dirB);
 
-void anticlockwise() {
-  if (count < maxSteps) { // Check if within maximum steps limit
-    for (int i = 0; i < 8; i++) {
-      setOutput(i);
-      delayMicroseconds(motorSpeed);
-    }
-    count++;
-  }
-}
+bool isRotatingRight = false; // Track if the motor is currently rotating right
+bool isRotatingLeft = false;  // Track if the motor is currently rotating left
 
-void clockwise() {
-  if (count > -maxSteps) { // Check if within maximum steps limit
-    for (int i = 7; i >= 0; i--) {
-      setOutput(i);
-      delayMicroseconds(motorSpeed);
-    }
-    count--;
-  }
-}
-void full(){
-   for (int i = 7; i >= 0; i--) {
-      setOutput(i);
-      delayMicroseconds(motorSpeed);
-    }
-}
+int currentPosition = 0; // Variable to track current position
 
 void setup() {
-  pinMode(motorPin1, OUTPUT);
-  pinMode(motorPin2, OUTPUT);
-  pinMode(motorPin3, OUTPUT);
-  pinMode(motorPin4, OUTPUT);
+  // Set the PWM and brake pins so that the direction pins can be used to control the motor:
+  pinMode(pwmA, OUTPUT);
+  pinMode(pwmB, OUTPUT);
+  pinMode(brakeA, OUTPUT);
+  pinMode(brakeB, OUTPUT);
 
   pinMode(buttonRightPin, INPUT_PULLUP);
   pinMode(buttonLeftPin, INPUT_PULLUP);
-  pinMode(buttonfullpin, INPUT_PULLUP);
+  pinMode(buttonFullPin, INPUT_PULLUP);
 
-  Serial.begin(9600);
+  digitalWrite(pwmA, HIGH);
+  digitalWrite(pwmB, HIGH);
+  digitalWrite(brakeA, LOW);
+  digitalWrite(brakeB, LOW);
+
+  // Set the motor speed (RPMs):
+  myStepper.setSpeed(60);
 }
 
 void loop() {
-  if (digitalRead(buttonRightPin) == LOW) {
-    clockwise();
-  }
-
-  if (digitalRead(buttonLeftPin) == LOW) {
-    anticlockwise();
-  }
-  if (digitalRead(buttonfullpin) == LOW){
+  // Step one revolution in one direction:
+  if (digitalRead(buttonRightPin) == HIGH && !isRotatingRight) {
+    rechts();
+  } else if (digitalRead(buttonLeftPin) == HIGH && !isRotatingLeft) {
+    links();
+  } else if (digitalRead(buttonFullPin) == HIGH){
     full();
   }
+}
+
+void rechts() {
+  if (!isRotatingLeft) {
+    myStepper.step(85.416);
+    currentPosition += 85.416; // Update position
+    isRotatingRight = true;
+  } else {
+    myStepper.step(170.832); // Dubbel zoveel stappen als links
+    currentPosition += 170.832; // Update position
+    isRotatingRight = true;
+    isRotatingLeft = false;
+  }
+}
+
+void links() {
+  if (!isRotatingRight) {
+    myStepper.step(-85.416);
+    currentPosition -= 85.416; // Update position
+    isRotatingLeft = true;
+  } else {
+    myStepper.step(-170.832); // Dubbel zoveel stappen als rechts
+    currentPosition -= 170.832; // Update position
+    isRotatingLeft = true;
+    isRotatingRight = false;
+  }
+}
+
+void full(){
+  int stepsToHome = -currentPosition; // Steps needed to return to start position
+  myStepper.step(stepsToHome);
+  currentPosition = 0; // Reset position to 0
+  isRotatingRight = false; // Reset rotation flags
+  isRotatingLeft = false;
+}
+
+void oneeighty(){
+
+  
 }
