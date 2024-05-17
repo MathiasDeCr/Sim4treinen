@@ -1,18 +1,16 @@
-import serial
-import tkinter as tk
-from tkinter import ttk
+import socket
 
-# Verander de poort naar de poort waarop je Arduino is aangesloten
-SERIAL_PORT = 'COM4'  # Bijvoorbeeld '/dev/ttyUSB0' op Linux of 'COM3' op Windows
-BAUD_RATE = 9600
+# IP-adres en poort van de Arduino Uno R4 WiFi
+ARDUINO_IP = '192.168.1.35'  # Vervang dit met het IP-adres van je Arduino
+ARDUINO_PORT = 80
 
-# Maak een seriële verbinding met de Arduino
-ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-
-# Functies om de verschillende knoppen te behandelen
+# Functie om commando's naar de Arduino te sturen via het netwerk
 def send_command(command):
-    ser.write(command.encode())
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect((ARDUINO_IP, ARDUINO_PORT))
+        s.sendall(command.encode())
 
+# Functies voor het sturen van specifieke commando's
 def button_right():
     send_command('R')
 
@@ -25,19 +23,21 @@ def button_full():
 def button_180():
     send_command('A')
 
-# GUI-venster
+# Je kunt hier de rest van je GUI-code plaatsen
+
+# Voorbeeld van GUI-code
+import tkinter as tk
+from tkinter import ttk
+
 root = tk.Tk()
 root.title("Arduino Motor Control")
 
-# Stijl voor de knoppen
-style = ttk.Style()
-style.configure('TButton', font=('Helvetica', 12))
-
-# Frames voor het centreren van knoppen
 frame_btn = tk.Frame(root)
 frame_btn.pack(pady=20)
 
-# Knoppen
+style = ttk.Style()
+style.configure('TButton', font=('Helvetica', 12))
+
 btn_right = ttk.Button(frame_btn, text="Right", command=button_right)
 btn_right.grid(row=0, column=0, padx=10)
 
@@ -50,5 +50,4 @@ btn_full.grid(row=0, column=2, padx=10)
 btn_180 = ttk.Button(frame_btn, text="180", command=button_180)
 btn_180.grid(row=0, column=3, padx=10)
 
-# Start GUI-loop
 root.mainloop()
