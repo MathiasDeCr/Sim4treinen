@@ -1,15 +1,25 @@
-import serial
+import socket
 import pyodbc
 from datetime import datetime
 
 # Verbinding maken met de Microsoft Access-database
 conn = pyodbc.connect(
     r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};'
-    r'DBQ=C:\KDG\sim4\Database11.accdb;'  # Vervang dit pad door het pad naar je eigen database
+    r'DBQ=C:\KDG\sim4\Database11.accdb;'
 )
+print('Verbonden met database')
 
 # Maak een cursor-object om queries uit te voeren
 cursor = conn.cursor()
+
+# Functie om geaccepteerde UID's en bijbehorende treinmodellen op te halen
+def get_accepted_uids():
+    cursor.execute("SELECT uid, train_model FROM accepted_uids")
+    rows = cursor.fetchall()
+    accepted_uids = {bytes.fromhex(row.uid): row.train_model for row in rows}
+    return accepted_uids
+
+accepted_uids = get_accepted_uids()
 
 # Functie om gegevens naar de database te schrijven
 def write_to_database(uid, uid_length, train_name, current_time):
@@ -17,58 +27,34 @@ def write_to_database(uid, uid_length, train_name, current_time):
                    (uid, uid_length, train_name, current_time))
     conn.commit()
 
-# Definieer de COM-poort en baudrate
-ser = serial.Serial('COM5', 115200)
-
-# Definieer geaccepteerde UID's en bijbehorende treinmodellen
-accepted_uids = [
-    bytes([0x63, 0x6A, 0xD2, 0x1F]),
-    bytes([0xB3, 0x55, 0xD2, 0x1F]),
-    bytes([0x13, 0x84, 0x04, 0xBE]),
-    bytes([0x83, 0xA7, 0xCE, 0x1F]),
-    bytes([0xB3, 0x63, 0x00, 0xBE])
-]
-
-train_models = [
-    "Trein model 1",
-    "Trein model 2",
-    "Trein model 3",
-    "Trein model 4",
-    "Trein model 5"
-]
+# Maak een socket object
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# Bind de socket aan het juiste IP-adres en poort
+s.bind(('0.0.0.0', 80))
+# Luister naar verbindingen
+s.listen(5)
 
 while True:
-    # Lees een regel van de seriële poort
-    line = ser.readline().decode().strip()
+    # Accepteer verbindingen van buitenaf
+    clientsocket, address = s.accept()
+    print(f"Connection from {address} has been established.")
 
-    # Controleer of de regel begint met "Found a card!"
-    if line == "Found a card!":
-        # Lees de volgende regel voor UID Lengte
-        uid_length = ser.readline().decode().strip().split(": ")[1]
-        print("UID Length:", uid_length)
+    # Ontvang gegevens van de Arduino
+    uid_string = clientsocket.recv(1024).strip().decode('utf-8')
+    print("UID Value:", uid_string)
 
-        # Lees de volgende regel voor UID Value
-        uid_value = ser.readline().decode().strip().split(": ")[1]
-        print("UID Value:", uid_value)
+    # Converteer hex string naar bytes
+    uid_value = bytes.fromhex(uid_string)
+    uid_length = len(uid_value)
 
-        # Haal de lengte van de UID op
-        uid_length = int(uid_length.split()[0])
+    # Controleer of de UID geaccepteerd is
+    if uid_length == 4 and uid_value in accepted_uids:
+        train_name = accepted_uids[uid_value]
+        current_time = datetime.now()
+        print("Accepted UID! Dit is trein:", train_name)
+        write_to_database(uid_value.hex().upper(), uid_length, train_name, current_time)
+    else:
+        print("Unauthorized card or UID has invalid length.")
 
-        # Controleer of de UID geaccepteerd is
-        if uid_length == 4:
-            uid_bytes = bytes([int(x, 16) for x in uid_value.split()])
-            if uid_bytes in accepted_uids:
-                # Vind de index van de geaccepteerde UID in de lijst
-                index = accepted_uids.index(uid_bytes)
-                # Haal de treinnaam op
-                train_name = train_models[index]
-                # Haal het moment van detectie op
-                current_time = datetime.now()
-                # Print de geaccepteerde UID en het bijbehorende treinmodel
-                print("Accepted UID! Dit is trein:", train_name)
-                # Schrijf de gegevens naar de database
-                write_to_database(uid_value, uid_length, train_name, current_time)
-            else:
-                print("Unauthorized card!")
-        else:
-            print("UID heeft een ongeldige lengte.")
+    # Sluit de clientsocket verbinding
+    clientsocket.close()
