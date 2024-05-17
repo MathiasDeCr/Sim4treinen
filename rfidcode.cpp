@@ -1,38 +1,32 @@
-#include <Arduino.h>
-#include <Wire.h>
+#include <WiFi.h>
 #include <SPI.h>
+#include <Wire.h>
 #include <Adafruit_PN532.h>
 
-#define PN532_SCK  (2)
-#define PN532_MOSI (3)
-#define PN532_SS   (4)
-#define PN532_MISO (5)
+#define PN532_SCK  D2
+#define PN532_MOSI D3
+#define PN532_SS   D4
+#define PN532_MISO D5
 
 Adafruit_PN532 nfc(PN532_SCK, PN532_MISO, PN532_MOSI, PN532_SS);
 
-#define PN532_IRQ   (2)
-#define PN532_RESET (3)
+const char* ssid     = "appelenpeer";
+const char* password = "6281appel";
+const char* server_ip = "192.168.36.150"; // Vervang door het IP-adres van je computer
+const int server_port = 80;
 
-#define NUM_ACCEPTED_UIDS 5
-
-const uint8_t acceptedUIDs[NUM_ACCEPTED_UIDS][4] = {
-  {0x63, 0x6A, 0xD2, 0x1F},
-  {0xB3, 0x55, 0xD2, 0x1F},
-  {0x13, 0x84, 0x4, 0xBE},
-  {0x83, 0xA7, 0xCE, 0x1F},
-  {0xB3, 0x63, 0x0, 0xBE}
-};
-
-const char* trainModels[NUM_ACCEPTED_UIDS] = {
-  "Trein model 1",
-  "Trein model 2",
-  "Trein model 3",
-  "Trein model 4",
-  "Trein model 5"
-};
-
-void setup(void) {
+void setup() {
   Serial.begin(115200);
+  Serial.print("Hallo");
+
+  // Connecteer met WiFi
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to WiFi");
+
   nfc.begin();
   uint32_t versiondata = nfc.getFirmwareVersion();
   if (!versiondata) {
@@ -46,7 +40,7 @@ void setup(void) {
   Serial.println("Waiting for an ISO14443A card");
 }
 
-void loop(void) {
+void loop() {
   uint8_t success;
   uint8_t uid[7] = { 0 };
   uint8_t uidLength;
@@ -55,33 +49,40 @@ void loop(void) {
 
   if (success) {
     Serial.println("Found a card!");
-    Serial.print("UID Length: ");Serial.print(uidLength, DEC);Serial.println(" bytes");
+    Serial.print("UID Length: "); Serial.print(uidLength, DEC); Serial.println(" bytes");
     Serial.print("UID Value: ");
     for (uint8_t i = 0; i < uidLength; i++) {
-      Serial.print(" 0x");Serial.print(uid[i], HEX);
+      Serial.print(" 0x"); Serial.print(uid[i], HEX);
     }
     Serial.println("");
 
-    bool isAccepted = false;
-    int acceptedIndex;
-    for (int i = 0; i < NUM_ACCEPTED_UIDS; i++) {
-      if (memcmp(uid, acceptedUIDs[i], uidLength) == 0) {
-        isAccepted = true;
-        acceptedIndex = i;
-        break;
-      }
-    }
+    if (uidLength == 4) {
+      // Stuur de UID via WiFi
+      Serial.println("Sending UID over WiFi...");
+      WiFiClient client;
+      if (client.connect(server_ip, server_port)) {
+        // Convert UID array to hexadecimal string
+        String uidString = "";
+        for (uint8_t i = 0; i < uidLength; i++) {
+          if (uid[i] < 0x10) {
+            uidString += "0";
+          }
+          uidString += String(uid[i], HEX);
+        }
+        uidString.toUpperCase(); // Optioneel converteren naar hoofdletters
 
-    if (isAccepted) {
-      Serial.print("Accepted UID! Dit is trein: ");
-      Serial.println(trainModels[acceptedIndex]);
+        // Print de UID string over WiFi
+        client.print(uidString);
+        client.stop();
+      } else {
+        Serial.println("Connection to server failed!");
+      }
     } else {
       Serial.println("Unauthorized card!");
     }
     
     delay(1000);
-  }
-  else {
+  } else {
     Serial.println("Timed out waiting for a card");
   }
 }
