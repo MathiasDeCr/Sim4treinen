@@ -10,10 +10,10 @@
 
 Adafruit_PN532 nfc(PN532_SCK, PN532_MISO, PN532_MOSI, PN532_SS);
 
-const char* ssid     = "appelenpeer";
-const char* password = "6281appel";
-const char* server_ip = "192.168.36.150"; // Vervang door het IP-adres van je computer
-const int server_port = 80;
+const char* ssid     = "IoT";
+const char* password = "KdGIoT70!";
+const char* server_ip = "10.6.121.155"; // Vervang door het IP-adres van je computer
+const int server_port = 80; 
 
 void setup() {
   Serial.begin(115200);
@@ -72,7 +72,31 @@ void loop() {
         uidString.toUpperCase(); // Optioneel converteren naar hoofdletters
 
         // Print de UID string over WiFi
-        client.print(uidString);
+        client.println(uidString);
+        client.println("E"); // Einde van bericht indicator
+        client.flush();
+
+        // Wacht op respons van server
+        while (client.connected()) {
+          if (client.available()) {
+            String response = client.readStringUntil('\n');
+            response.trim();
+            Serial.println("Server response: " + response);
+            if (response == "AUTHORIZED") {
+              Serial.println("Card is authorized, sending rotate command...");
+              // Verstuur rotatiecommando naar motorcontroller
+              WiFiClient motorClient;
+              if (motorClient.connect(server_ip, server_port)) {
+                motorClient.println("ROTATE");
+                motorClient.stop();
+              }
+            } else {
+              Serial.println("Card is not authorized.");
+            }
+            break;
+          }
+        }
+
         client.stop();
       } else {
         Serial.println("Connection to server failed!");
