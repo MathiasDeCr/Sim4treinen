@@ -66,7 +66,7 @@ void loop() {
           uidString += String(uid[i], HEX);
         }
         uidString.toUpperCase();
-
+        //dit is voor het versturen naar de arduino dat momenteel niet werkt
         // Print de UID 
         client.println(uidString);
         client.println("E"); 
