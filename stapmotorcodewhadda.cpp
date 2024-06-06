@@ -1,17 +1,13 @@
 #include <WiFi.h>
 #include "Stepper.h"
+#include "arduino_motor_config.h"  // Voeg deze regel toe
 
-#define PIR_PIN 2 // Pin voor PIR-sensor
-
-char ssid[] = "IoT";     // naam van je WiFi-netwerk
-char pass[] = "KdGIoT70!"; // wachtwoord van je WiFi-netwerk
-
-WiFiServer server(80);
+WiFiServer server(server_port);  // Gebruik de variabele uit config.h
 
 // Define number of steps per revolution:
 const int stepsPerRevolution = 300;
 
-// Give the motor control pins names:
+// Geef de motoraansturingspinnen namen:
 #define pwmA 3
 #define pwmB 11
 #define brakeA 9
@@ -19,32 +15,30 @@ const int stepsPerRevolution = 300;
 #define dirA 12
 #define dirB 13
 
-// Buttons
+// Knoppen
 int buttonRightPin = 5;
 int buttonLeftPin = 6;
-int buttonFullPin = 7; // New button pin for 180-degree rotation
+int buttonFullPin = 7; // Nieuwe knop pin voor 180 graden rotatie
 int button180Pin = 4;
 
-// Initialize the stepper library on the motor shield:
+// Initialiseer de stepper bibliotheek op het motor schild:
 Stepper myStepper = Stepper(stepsPerRevolution, dirA, dirB);
 
-bool isRotatingRight = false; // Track if the motor is currently rotating right
-bool isRotatingLeft = false;  // Track if the motor is currently rotating left
+bool isRotatingRight = false; // Bijhouden of de motor momenteel naar rechts draait
+bool isRotatingLeft = false;  // Bijhouden of de motor momenteel naar links draait
 
-int currentPosition = 0; // Variable to track current position
+int currentPosition = 0; // Variabele om huidige positie bij te houden
 
 void setup() {
   Serial.begin(9600);
   while (!Serial) {
-    ; // Wait until serial port is opened
+    ; // Wacht tot de seriële poort is geopend
   }
 
-  pinMode(PIR_PIN, INPUT); // Configure PIR pin as input
-
-  // Connect to WiFi network
+  // Verbinden met WiFi-netwerk
   Serial.println();
-  Serial.println("Connecting to WiFi...");
-  WiFi.begin(ssid, pass);
+  Serial.println("Verbinden met WiFi...");
+  WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -52,15 +46,13 @@ void setup() {
   }
 
   Serial.println("");
-  Serial.println("WiFi connected");
-  Serial.println("IP address: ");
+  Serial.println("WiFi verbonden");
+  Serial.println("IP-adres: ");
   Serial.println(WiFi.localIP());
-
-
 
   server.begin();
 
-  // Set the PWM and brake pins so that the direction pins can be used to control the motor:
+  // Stel de PWM- en rempinnen in zodat de richtingspinnen kunnen worden gebruikt om de motor aan te sturen:
   pinMode(pwmA, OUTPUT);
   pinMode(pwmB, OUTPUT);
   pinMode(brakeA, OUTPUT);
@@ -69,90 +61,79 @@ void setup() {
   pinMode(buttonRightPin, INPUT_PULLUP);
   pinMode(buttonLeftPin, INPUT_PULLUP);
   pinMode(buttonFullPin, INPUT_PULLUP);
-  pinMode(button180Pin, INPUT_PULLUP); // Set the new button pin as input with pull-up resistor
+  pinMode(button180Pin, INPUT_PULLUP); // Stel de nieuwe knop pin in als invoer met pull-up weerstand
 
   digitalWrite(pwmA, HIGH);
   digitalWrite(pwmB, HIGH);
   digitalWrite(brakeA, LOW);
   digitalWrite(brakeB, LOW);
 
-  // Set the motor speed (RPMs):
+  // Stel de motorsnelheid in (RPM's):
   myStepper.setSpeed(60);
 
-  // Set the initial position to 0
+  // Stel de beginpositie in op 0
   myStepper.step(-currentPosition);
 }
 
 void loop() {
-  // Check PIR sensor for motion
-  if (digitalRead(PIR_PIN) == HIGH) {
-    // Beweging gedetecteerd, breng de motor naar de nulpositie als de motor niet al op nul staat
-    if (currentPosition != 0) {
-      moveToZero();
-      Serial.println("Motion detected! Moving motor to zero position.");
-    }
-  }
-
   WiFiClient client = server.available();
-  if (!client) {
-    return;
+  if (client) {
+    while (!client.available()) {
+      delay(1);
+    }
+
+    // Lees het commando van de client
+    String command = client.readStringUntil('\r');
+    client.flush();
+
+    // Voer het ontvangen commando uit
+    if (command == "R") {
+      if (!isRotatingRight && currentPosition != 1025) {
+        rechts();
+        
+      }
+    } else if (command == "L") {
+      if (!isRotatingLeft && currentPosition != 1025) {
+        links();
+        Serial.print("ok");
+      }
+    } else if (command == "F") {
+      if (currentPosition != 0) {
+        moveToZero();
+        Serial.print("ok");
+      }
+    } else if (command == "A") {
+      if (currentPosition == 0) {
+        rotate180();
+        Serial.print("ok");
+      }
+    }
   }
 
-  while (!client.available()) {
-    delay(1);
-  }
-
-  // Read the command from the client
-  String command = client.readStringUntil('\r');
-  client.flush();
-
-  // Execute the received command
-  if (command == "R") {
-    if (!isRotatingRight && currentPosition != 1025) {
-      rechts();
-      
-    }
-  } else if (command == "L") {
-    if (!isRotatingLeft && currentPosition != 1025) {
-      links();
-      Serial.print("ok");
-    }
-  } else if (command == "F") {
-    if (currentPosition != 0) {
-      full();
-      Serial.print("ok");
-    }
-  } else if (command == "A") {
-    if (currentPosition == 0) {
-      rotate180();
-      Serial.print("ok");
-    }
-  }
-  
-  // Check physical buttons
+  // Controleer fysieke knoppen
   if (digitalRead(buttonRightPin) == HIGH && !isRotatingRight && currentPosition != 1025) {
     rechts();
-    Serial.print("ok");
+    Serial.print("okright");
   } else if (digitalRead(buttonLeftPin) == HIGH && !isRotatingLeft && currentPosition != 1025) {
     links();
-    Serial.print("ok");
+    Serial.print("okleft");
   } else if (digitalRead(buttonFullPin) == HIGH && currentPosition != 0) {
-    full();
-    Serial.print("ok");
+    moveToZero();
+    Serial.print("okfull");
   } else if (digitalRead(button180Pin) == HIGH && currentPosition == 0) {
     rotate180();
-    Serial.print("ok");
+    Serial.print("ok180");
   }
 }
 
 void rechts() {
   if (!isRotatingLeft) {
     myStepper.step(90);
-    currentPosition += 90; // Update position
+    currentPosition += 90; // Update positie
     isRotatingRight = true;
   } else {
-    myStepper.step(180); // Double the steps compared to left
-    currentPosition += 180; // Update position
+    myStepper.step(180); // Verdubbel de stappen in vergelijking met links
+    currentPosition += 180; // Update positie
     isRotatingRight = true;
     isRotatingLeft = false;
   }
@@ -161,38 +142,30 @@ void rechts() {
 void links() {
   if (!isRotatingRight) {
     myStepper.step(-90);
-    currentPosition -= 90; // Update position
+    currentPosition -= 90; // Update positie
     isRotatingLeft = true;
   } else {
-    myStepper.step(-180); // Double the steps compared to right
-    currentPosition -= 180; // Update position
+    myStepper.step(-180); // Verdubbel de stappen in vergelijking met rechts
+    currentPosition -= 180; // Update positie
     isRotatingLeft = true;
     isRotatingRight = false;
   }
 }
 
-void full() {
-  int stepsToHome = -currentPosition; // Steps needed to return to start position
-  myStepper.step(stepsToHome);
-  currentPosition = 0; // Reset position to 0
-  isRotatingRight = false; // Reset rotation flags
-  isRotatingLeft = false;
-}
-
 void rotate180() {
-  if (currentPosition == 0) { // Check if current position is 0
-    myStepper.step(1025); // Rotate 180 degrees (1025 steps)
-    currentPosition = 1025; // Update position to 1025
+  if (currentPosition == 0) { // Controleer of huidige positie 0 is
+    myStepper.step(1025); // Draai 180 graden (1025 stappen)
+    currentPosition = 1025; // Update positie naar 1025
   }
 }
 
 void moveToZero() {
   // Beweeg alleen naar nulpositie als de huidige positie niet al nul is
   if (currentPosition != 0) {
-    int stepsToZero = -currentPosition; // Steps needed to return to zero position
+    int stepsToZero = -currentPosition; // Stappen nodig om terug te keren naar de nulpositie
     myStepper.step(stepsToZero);
-    currentPosition = 0; // Reset position to 0
-    isRotatingRight = false; // Reset rotation flags
+    currentPosition = 0; // Reset positie naar 0
+    isRotatingRight = false; // Reset rotatie vlaggen
     isRotatingLeft = false;
   }
 }
