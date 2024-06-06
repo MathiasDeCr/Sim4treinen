@@ -2,8 +2,8 @@
 #include <SPI.h>
 #include <Wire.h>
 #include <Adafruit_PN532.h>
-#include "rfid_firebeetle_config.h"  // Voeg deze regel toe
-
+#include "rfid_firebeetle_config.h"  
+//pins voor rfid reader
 #define PN532_SCK  D2
 #define PN532_MOSI D3
 #define PN532_SS   D4
@@ -66,13 +66,13 @@ void loop() {
           uidString += String(uid[i], HEX);
         }
         uidString.toUpperCase(); // Optioneel converteren naar hoofdletters
-
-        // Print de UID string via WiFi
+        //dit is niet werkende code dat authorisatie naar de arduino zou sturen om het met analoge knoppen te laten werken
+        // Print de UID
         client.println(uidString);
         client.println("E"); // Einde van bericht indicator
         client.flush();
 
-        // Wacht op respons van server
+        // Wacht op server
         while (client.connected()) {
           if (client.available()) {
             String response = client.readStringUntil('\n');
@@ -80,7 +80,7 @@ void loop() {
             Serial.println("Server respons: " + response);
             if (response == "AUTHORIZED") {
               Serial.println("Kaart is geautoriseerd, versturen rotatie commando...");
-              // Verstuur rotatiecommando naar motorcontroller
+              // stuur command naar arduino 
               WiFiClient motorClient;
               if (motorClient.connect(server_ip, server_port)) {
                 motorClient.println("ROTATE");
