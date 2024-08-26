@@ -1,6 +1,7 @@
-#include <WiFi.h>
+#include <WiFiS3.h>
+#include <ArduinoJson.h>
 #include "Stepper.h"
-#include "arduino_motor_config.h"  // Voeg deze regel toe
+#include "arduino_motor_config.h"
 
 WiFiServer server(server_port);  // Gebruik de variabele uit config.h
 
@@ -20,6 +21,9 @@ int buttonRightPin = 5;
 int buttonLeftPin = 6;
 int buttonFullPin = 7; // Nieuwe knop pin voor 180 graden rotatie
 int button180Pin = 4;
+
+// Telegram bot gegevens
+
 
 // Initialiseer de stepper bibliotheek op het motor schild:
 Stepper myStepper = Stepper(stepsPerRevolution, dirA, dirB);
@@ -90,22 +94,22 @@ void loop() {
     if (command == "R") {
       if (!isRotatingRight && currentPosition != 1025) {
         rechts();
-        
+        sendMessageToTelegram("Motor draait naar rechts.");
       }
     } else if (command == "L") {
       if (!isRotatingLeft && currentPosition != 1025) {
         links();
-        Serial.print("ok");
+        sendMessageToTelegram("Motor draait naar links.");
       }
     } else if (command == "F") {
       if (currentPosition != 0) {
         moveToZero();
-        Serial.print("ok");
+        sendMessageToTelegram("Motor draait terug naar 0.");
       }
     } else if (command == "A") {
       if (currentPosition == 0) {
         rotate180();
-        Serial.print("ok");
+        sendMessageToTelegram("Motor draait 180 graden.");
       }
     }
   }
@@ -113,16 +117,16 @@ void loop() {
   // Controleer fysieke knoppen
   if (digitalRead(buttonRightPin) == HIGH && !isRotatingRight && currentPosition != 1025) {
     rechts();
-    Serial.print("okright");
+    sendMessageToTelegram("Motor draait naar rechts (knop ingedrukt).");
   } else if (digitalRead(buttonLeftPin) == HIGH && !isRotatingLeft && currentPosition != 1025) {
     links();
-    Serial.print("okleft");
+    sendMessageToTelegram("Motor draait naar links (knop ingedrukt).");
   } else if (digitalRead(buttonFullPin) == HIGH && currentPosition != 0) {
     moveToZero();
-    Serial.print("okfull");
+    sendMessageToTelegram("Motor draait terug naar 0 (knop ingedrukt).");
   } else if (digitalRead(button180Pin) == HIGH && currentPosition == 0) {
     rotate180();
-    Serial.print("ok180");
+    sendMessageToTelegram("Motor draait 180 graden (knop ingedrukt).");
   }
 }
 
@@ -168,4 +172,33 @@ void moveToZero() {
     isRotatingRight = false; // Reset rotatie vlaggen
     isRotatingLeft = false;
   }
+}
+
+void sendMessageToTelegram(String message) {
+  WiFiSSLClient client;
+  
+  if (client.connect("api.telegram.org", 443)) {  // Verbinden met de Telegram server
+    String url = "/bot" + String(botToken) + "/sendMessage?chat_id=" + String(chatId) + "&text=" + message;
+    
+    // Maak HTTP verzoek
+    client.println("GET " + url + " HTTP/1.1");
+    client.println("Host: api.telegram.org");
+    client.println("Connection: close");
+    client.println();
+    
+    // Debug: Toon het verzonden bericht
+    Serial.println("Verzonden naar Telegram: " + message);
+    
+    // Debug: Toon de server response
+    while (client.connected()) {
+      String line = client.readStringUntil('\n');
+      if (line == "\r") {
+        break;
+      }
+      Serial.println(line);
+    }
+  } else {
+    Serial.println("Verbinding met Telegram mislukt!");
+  }
+  client.stop();
 }
