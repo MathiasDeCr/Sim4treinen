@@ -3,10 +3,13 @@
 #define CONFIG_H
 
 // WiFi credentials
-const char* ssid = "mmdecr_thuis-2.4";
-const char* password = "Da224067af";
+const char* ssid = "ssid";
+const char* password = "password";
 
 // Server IP address
 const int server_port = 80;
+// telegram creds
+const char* botToken = "token";
+const char* chatId = "cahtid";
 
 #endif
